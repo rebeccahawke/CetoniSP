@@ -380,15 +380,18 @@ class CetoniSP(object):
         """
         if not self.is_configured:
             return False
+
         print("Beginning oscillating flow with max flow rate of {} {} "
               "and period of {} s, for {} cycles".format(A, self.flow_unit, T, cycles))
+        print("Time (s), Syringe fill level ({}), Flow ({})".format(self.vol_unit, self.flow_unit))
+
         t0 = perf_counter()
         while perf_counter() - t0 < cycles * T:
             t = perf_counter() - t0
             flow = A * np.sin(2 * np.pi * t / T)
             self.pump.generate_flow(flow)
             sleep(0.2)
-            print(perf_counter() - t0, self.syringe_fill_level)
+            print(perf_counter() - t0, self.syringe_fill_level, flow)
 
         self.pump.generate_flow(0)
 
