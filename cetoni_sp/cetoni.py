@@ -1,5 +1,7 @@
 import sys
 import os
+import numpy as np
+from time import sleep, perf_counter
 
 qmixsdk_dir = r"C:\Users\Public\QmixSDK"
 sys.path.append(qmixsdk_dir + "/lib/python")
@@ -11,15 +13,16 @@ os.environ['LOG4CPLUS_LOGLOG_QUIETMODE'] = 'false'
 from qmixsdk import qmixbus
 from qmixsdk import qmixpump
 from qmixsdk import qmixvalve
-from qmixsdk.qmixbus import UnitPrefix, TimeUnit
+# from qmixsdk.qmixbus import UnitPrefix, TimeUnit
 
-from time import sleep
 
 timeout = 60*60*12
+
 
 class CetoniSP(object):
     def __init__(self, deviceconfig):
         # Open bus with deviceconfig
+        # N.B. create the deviceconfig file using the QmixElements software
         self.bus = qmixbus.Bus()
         self.bus.open(deviceconfig, 0)
 
@@ -32,11 +35,11 @@ class CetoniSP(object):
     def look_for_devices(self):
         print("Looking up devices...")
         pumpcount = qmixpump.Pump.get_no_of_pumps()
-        print("Number of pumps: ", pumpcount)
+        print("Number of pumps: {}".format(pumpcount))
         for i in range(pumpcount):
             pump2 = qmixpump.Pump()
             pump2.lookup_by_device_index(i)
-            print("Name of pump ", i, " is ", pump2.get_device_name())
+            print("Name of pump {} is {}".format(i, pump2.get_device_name()))
 
     def device_name_lookup(self, name):
         # Find specific pump
@@ -77,7 +80,7 @@ class CetoniSP(object):
     @staticmethod
     def wait_dosage_finished(pump, timeout_seconds):
         """
-        The function waits until the last dosage command has finished
+        The function waits until the last dosage command has finished or
         until the timeout occurs.
         """
         timer = qmixbus.PollingTimer(timeout_seconds * 1000)
@@ -87,7 +90,7 @@ class CetoniSP(object):
             sleep(0.1)
             # TODO: make this process not hold up any other processes
             if message_timer.is_expired():
-                print("Fill level: ", pump.get_fill_level())
+                print("Fill level: {}".format(pump.get_fill_level()))
                 message_timer.restart()
             result = pump.is_pumping()
         return not result
@@ -132,18 +135,24 @@ class CetoniSP(object):
             'L': (qmixpump.UnitPrefix.unit, qmixpump.VolumeUnit.litres),
         }
         self.pump.set_volume_unit(vol_units.get(vol_unit)[0], vol_units.get(vol_unit)[1])
-        print("Max. volume: ", round(self.pump.get_volume_max(), 3), vol_unit)
+        print("Max. volume: {} {}".format(round(self.pump.get_volume_max(), 3), vol_unit))
 
         flow_units = {
             'mL/s': (qmixpump.UnitPrefix.milli, qmixpump.VolumeUnit.litres, qmixpump.TimeUnit.per_second),
             'mL/min': (qmixpump.UnitPrefix.milli, qmixpump.VolumeUnit.litres, qmixpump.TimeUnit.per_minute),
         }
         self.pump.set_flow_unit(flow_units.get(flow_unit)[0], flow_units.get(flow_unit)[1], flow_units.get(flow_unit)[2])
-        print("Max. flow: ", round(self.pump.get_flow_rate_max(), 3), flow_unit)
+        print("Max. flow: {} {}".format(round(self.pump.get_flow_rate_max(), 3), flow_unit))
 
-        # TODO: get these as nice strings from the qmixpump objects
         self.vol_unit = vol_unit
         self.flow_unit = flow_unit
+
+        s_v = self.pump.get_volume_unit()
+        for i, u in enumerate(vol_units.get(vol_unit)):
+            assert u == s_v[i]
+        s_f = self.pump.get_flow_unit()
+        for i, u in enumerate(flow_units.get(flow_unit)):
+            assert u == s_f[i]
 
         return self.pump.get_volume_unit(), self.pump.get_flow_unit()
 
@@ -159,7 +168,7 @@ class CetoniSP(object):
         self.pump.calibrate()
         sleep(0.2)
         self.calibrated = self.wait_calibration_finished(self.pump, timeout)
-        print("Pump calibrated: ", self.calibrated)
+        print("Pump calibrated: {}".format(self.calibrated))
         assert self.calibrated
 
     @property
@@ -331,8 +340,7 @@ class CetoniSP(object):
         finished = self.wait_dosage_finished(self.pump, timeout)
         return finished
 
-
-    def generate_flow(self):
+    def test_generate_flow(self):
         if not self.is_configured:
             return False
         print("Testing generating flow...")
@@ -343,6 +351,48 @@ class CetoniSP(object):
         assert(round(max_flow, 1) == round(flow_is, 1))
         finished = self.wait_dosage_finished(self.pump, timeout)
         assert finished
+
+    def generate_flow(self, flow):
+        if not self.is_configured:
+            return False
+        self.pump.generate_flow(flow)
+        print("Generating flow")
+        flow_is = self.pump.get_flow_is()
+        assert(round(flow, 3) == round(flow_is, 3))
+        print(flow_is)
+
+    def generate_osc_flow(self, A, T, cycles):
+        """Generate sinusoidally oscillating flow with amplitude A in flow units,
+        and time period T in seconds, lasting for a duration in seconds
+
+        Parameters
+        ----------
+        A : float
+            amplitude of sinusoid in whatever flow units have been set for the pump
+        T : float
+            period of sinusoid in seconds
+        cycles : float
+            number of full oscillations
+
+        Returns
+        -------
+        Bool on completion
+        """
+        if not self.is_configured:
+            return False
+        print("Beginning oscillating flow with max flow rate of {} {} "
+              "and period of {} s, for {} cycles".format(A, self.flow_unit, T, cycles))
+        t0 = perf_counter()
+        while perf_counter() - t0 < cycles * T:
+            t = perf_counter() - t0
+            flow = A * np.sin(2 * np.pi * t / T)
+            self.pump.generate_flow(flow)
+            sleep(0.2)
+            print(perf_counter() - t0, self.syringe_fill_level)
+
+        self.pump.generate_flow(0)
+
+        return True
 
     def test_set_syringe_level(self):
         if not self.is_configured:
@@ -383,7 +433,7 @@ class CetoniSP(object):
 
         valve = self.pump.get_valve()
         valve_pos_count = valve.number_of_valve_positions()
-        print("Valve positions: ", valve_pos_count)
+        print("Valve positions: {}".format(valve_pos_count))
         for i in range(valve_pos_count):
             valve.switch_valve_to_position(i)
             sleep(0.2)  # give valve some time to move to target
