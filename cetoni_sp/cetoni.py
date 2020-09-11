@@ -2,8 +2,10 @@ import sys
 import os
 import numpy as np
 from time import sleep, perf_counter
+from openpyxl import Workbook
 
-qmixsdk_dir = r"C:\Users\Public\QmixSDK"
+qmixsdk_dir = r"C:\Users\Public\QmixSDK_MSVC17-64bit_Setup_v20200902"
+# updated QmixSDK using MSVC compiler for dlls; note that these libraries are in PyQt5 version 12
 sys.path.append(qmixsdk_dir + "/lib/python")
 os.environ['PATH'] += os.pathsep + qmixsdk_dir
 sys.path.append(qmixsdk_dir)
@@ -157,14 +159,13 @@ class CetoniSP(object):
         return self.pump.get_volume_unit(), self.pump.get_flow_unit()
 
     def calibrate_pump(self):
-        # from cetoni_sp.prompt_thread import PromptThread
-        # prompt_me = PromptThread()
-        # prompt_me.show('ok_cancel', "Remove syringe from pump before commencing self-calibration", font=None,
-        #                        title='Pump Preparation')
-        # ok = prompt_me.wait_for_prompt_reply()
-        # if not ok:
-        #     return
+        """Run the self-calibration routine to set internal limits"""
+
         print("Calibrating pump...")
+        # check no syringe in pump
+        if not self.check_no_syringe_in_pump('self-calibration'):
+            return
+
         self.pump.calibrate()
         sleep(0.2)
         self.calibrated = self.wait_calibration_finished(self.pump, timeout)
@@ -207,10 +208,28 @@ class CetoniSP(object):
         else:
             return None
 
+    @property
+    def flow_rate_is(self):
+        """Poll syringe pump for current flow rate
+
+        Returns
+        -------
+        float of current flow rate, or None if pump not configured
+        """
+        if self.is_configured:
+            return self.pump.get_flow_is()
+        else:
+            return None
+
     def test_aspirate(self):
         if not self.is_configured:
             return False
+
         print("Testing aspiration...")
+        # check no syringe in pump
+        if not self.check_no_syringe_in_pump('test'):
+            return
+
         max_volume = self.pump.get_volume_max() / 2
         if max_volume > self.pump.get_fill_level():
             max_volume -= self.pump.get_fill_level()
@@ -254,7 +273,12 @@ class CetoniSP(object):
     def test_dispense(self):
         if not self.is_configured:
             return False
+
         print("Testing dispensing...")
+        # check no syringe in pump
+        if not self.check_no_syringe_in_pump('test'):
+            return
+
         max_volume = self.pump.get_volume_max() / 10
         if max_volume > self.pump.get_fill_level():
             max_volume -= self.pump.get_fill_level()
@@ -299,7 +323,12 @@ class CetoniSP(object):
         # tests pump for aspirate and then dispense, at same flow rate
         if not self.is_configured:
             return False
+
         print("Testing pumping volume...")
+        # check no syringe in pump
+        if not self.check_no_syringe_in_pump('test'):
+            return
+
         pumped_volume = self.pump.get_volume_max() / 10
         max_flow = self.pump.get_flow_rate_max() / 3
 
@@ -330,10 +359,10 @@ class CetoniSP(object):
         if not self.is_configured:
             return False
         if not 0 <= flow <= self.pump.get_flow_rate_max():
-            print('flow of {} requested is outside bounds {}'.format(flow, self.pump.get_flow_rate_max()))
+            print('Flow of {} requested is outside bounds {}'.format(flow, self.pump.get_flow_rate_max()))
         if not 0 <= self.syringe_fill_level - volume <= self.pump.get_volume_max():
-            print('forbidden volume')
-            print('asked for {}, but would reach {}'.format(volume, self.syringe_fill_level - volume))
+            print('Forbidden volume')
+            print('Asked for {}, but would reach {}'.format(volume, self.syringe_fill_level - volume))
             return False
 
         self.pump.pump_volume(volume, flow)
@@ -343,7 +372,12 @@ class CetoniSP(object):
     def test_generate_flow(self):
         if not self.is_configured:
             return False
+
         print("Testing generating flow...")
+        # check no syringe in pump
+        if not self.check_no_syringe_in_pump('test'):
+            return
+
         max_flow = self.pump.get_flow_rate_max()/3
         self.pump.generate_flow(max_flow)
         sleep(1)
@@ -355,14 +389,19 @@ class CetoniSP(object):
     def generate_flow(self, flow):
         if not self.is_configured:
             return False
-        self.pump.generate_flow(flow)
-        print("Generating flow")
-        flow_is = self.pump.get_flow_is()
-        assert(round(flow, 3) == round(flow_is, 3))
-        print(flow_is)
+        if not -self.pump.get_flow_rate_max() <= flow <= self.pump.get_flow_rate_max():
+            print('Flow of {} requested is outside bounds {}'.format(flow, self.pump.get_flow_rate_max()))
 
-    def generate_osc_flow(self, A, T, cycles):
-        """Generate sinusoidally oscillating flow with amplitude A in flow units,
+        self.pump.generate_flow(flow)
+        print("Generating flow of {} {}".format(flow, self.flow_unit))
+        sleep(0.2)
+        flow_is = self.pump.get_flow_is()
+        assert(round(flow, 2) == round(flow_is, 2))
+
+        return flow_is
+
+    def generate_osc_flow(self, A, T, cycles, save_to=None):
+        """Generate sinusoidally oscillating flow with amplitude A in flow units where time is in minutes,
         and time period T in seconds, lasting for a duration in seconds
 
         Parameters
@@ -380,27 +419,56 @@ class CetoniSP(object):
         """
         if not self.is_configured:
             return False
+        if not 0 <= A <= self.pump.get_flow_rate_max():
+            print('Flow of {} requested is outside bounds {}'.format(A, self.pump.get_flow_rate_max()))
+
+        volume_change = A * T * 1/60 * 1/np.pi
+        print("Volume change in volume unit if time is in minutes", volume_change)
+        if volume_change > self.syringe_fill_level:
+            print('Requested volume change too large; only {} {} remaining'.format(round(self.syringe_fill_level, 3), self.vol_unit))
+            return False
+
+        wb = Workbook()
+        ws = wb.active
 
         print("Beginning oscillating flow with max flow rate of {} {} "
               "and period of {} s, for {} cycles".format(A, self.flow_unit, T, cycles))
-        print("Time (s), Syringe fill level ({}), Flow ({})".format(self.vol_unit, self.flow_unit))
+        header = [
+            "Time (s)",
+            "Syringe fill level ({})".format(self.vol_unit),
+            "Flow ({})".format(self.flow_unit)
+            ]
+        print(header)
+        if save_to is not None:
+            ws.append(header)
 
         t0 = perf_counter()
         while perf_counter() - t0 < cycles * T:
             t = perf_counter() - t0
             flow = A * np.sin(2 * np.pi * t / T)
             self.pump.generate_flow(flow)
-            sleep(0.2)
-            print(perf_counter() - t0, self.syringe_fill_level, flow)
+            sleep(0.15)
+            row = [perf_counter() - t0, self.syringe_fill_level, self.flow_rate_is]
+            print(row)
+            if save_to is not None:
+                ws.append(row)
 
-        self.pump.generate_flow(0)
+        self.generate_flow(0)
+
+        if save_to is not None:
+            wb.save(save_to)
 
         return True
 
     def test_set_syringe_level(self):
         if not self.is_configured:
             return False
+
         print("Testing set syringe fill level...")
+        # check no syringe in pump
+        if not self.check_no_syringe_in_pump('test'):
+            return
+
         max_flow = self.pump.get_flow_rate_max() / 2
         max_volume = self.pump.get_volume_max() / 2
         self.pump.set_fill_level(max_volume, max_flow)
@@ -423,7 +491,7 @@ class CetoniSP(object):
         if not flow:
             flow = self.pump.get_flow_rate_max() / 3
         if 0 <= vol <= self.pump.get_volume_max():
-            print('setting syringe level to {} {}'.format(vol, self.vol_unit))
+            print('Setting syringe level to {} {}'.format(vol, self.vol_unit))
             self.pump.set_fill_level(vol, flow)
             finished = self.wait_dosage_finished(self.pump, timeout)
             assert finished
@@ -431,7 +499,7 @@ class CetoniSP(object):
     def test_valve(self):
         print("Testing valve...")
         if not self.pump.has_valve():
-            print("no valve installed")
+            print("No valve installed")
             return
 
         valve = self.pump.get_valve()
@@ -470,3 +538,11 @@ class CetoniSP(object):
         self.bus.stop()
         self.bus.close()
 
+    @staticmethod
+    def check_no_syringe_in_pump(operation):
+        # check no syringe in pump
+        ok = input("Remove syringe from pump before commencing {}."
+                   "\nPress enter to continue or press c to cancel".format(operation))
+        if 'c' in ok.lower():
+            return False
+        return True
