@@ -1,0 +1,1 @@
+from .plot_data import fit_sinusoid

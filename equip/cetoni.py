@@ -546,3 +546,11 @@ class CetoniSP(object):
         if 'c' in ok.lower():
             return False
         return True
+
+    @staticmethod
+    def install_syringe():
+        ok = input("OK to install syringe. Press enter when syringe installed or press c to cancel")
+        if 'c' in ok.lower():
+            return False
+        return True
+
