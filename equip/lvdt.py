@@ -1,12 +1,13 @@
-import pyvisa
 
-rm = pyvisa.ResourceManager()
 
 
 class LVDT_HP3458A(object):
 
-    def __init__(self):
-        self.lvdt = rm.open_resource("GPIB0::23::INSTR")
+    def __init__(self, record):
+        self.record = record
+        self.lvdt = self.record.connect()
+
+        # self.lvdt = rm.open_resource("GPIB0::23::INSTR")
 
     def configure_lvdt(self, n):
 
