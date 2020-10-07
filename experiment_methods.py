@@ -3,10 +3,22 @@ from time import time
 
 # from PyQt5 import QtWidgets
 
-from equip import CetoniSP
+from equip import CetoniSP, RFCounter
 from data_handling import fit_sinusoid
 
 # app = QtWidgets.QApplication([])
+'''
+from msl.equipment import Config
+
+config = r'config.xml'
+cfg = Config(config)               # loads cfg file
+db = cfg.database()           # loads database
+equipment = db.equipment      # loads subset of database with equipment being used
+
+
+for record in equipment():
+    print(record)
+'''
 
 
 class Experimenter(object):
@@ -36,9 +48,23 @@ class Experimenter(object):
 
         self.sp.set_syringe_level(vol, flow=flow)
 
-    def run_single_step(self, start, stop, duration):
+    def run_single_step(self, start_vol, stop_vol, flow, trig_interval):
 
-        print(start, stop, duration)
+        time_diff_min = (stop_vol - start_vol)/flow
+        time_diff_sec = time_diff_min*60
+
+        n_meas = time_diff_sec*trig_interval
+        self.rfcounter.configure_rfcounter(n_meas, trig_interval)
+
+        self.sp.set_syringe_level(start_vol)
+
+        vol = start_vol - stop_vol      # because a 'positive volume' is dispensed
+        # thread 1:
+        self.sp.pump_volume(vol, flow)
+        # thread 2:
+        rf_data = self.rfcounter.read_n_raw_readings(n_meas)
+
+
 
     def run_triangle_wave(self):
 
