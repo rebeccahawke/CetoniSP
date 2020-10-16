@@ -1,7 +1,7 @@
 import sys
 import os
 import numpy as np
-from time import sleep, perf_counter
+from time import sleep, perf_counter, time_ns
 from openpyxl import Workbook
 
 qmixsdk_dir = r"C:\Users\Public\QmixSDK_MSVC17-64bit_Setup_v20200902"
@@ -90,12 +90,47 @@ class CetoniSP(object):
         result = True
         while result and not timer.is_expired():
             sleep(0.1)
-            # TODO: make this process not hold up any other processes
             if message_timer.is_expired():
-                print("Fill level: {}".format(pump.get_fill_level()))
+                fl = pump.get_fill_level()
+                print("Fill level: {}".format(fl))
                 message_timer.restart()
             result = pump.is_pumping()
         return not result
+
+    @staticmethod
+    def collect_position_data(pump, timeout_seconds, time_int):
+        """Collect syringe fill level information during dosage,
+        following the protocol above.
+
+        Parameters
+        ----------
+        pump : pump
+            reference to syringe pump, here self.pump
+        timeout_seconds : int
+            when to give up waiting for the pump to stop pumping
+        time_int : float
+            time interval in ms (?) between readings of fill level
+
+        Returns
+        -------
+        tuple of t_data, fl_data; time in seconds and fill level in unit set for pump
+        """
+        print("Collecting position data every {} ms".format(time_int))
+        timer = qmixbus.PollingTimer(timeout_seconds * 1000)
+        message_timer = qmixbus.PollingTimer(time_int)
+        result = True
+        t_data = []
+        fl_data = []
+        while result and not timer.is_expired():
+            if message_timer.is_expired():
+                t = time_ns() / 1e9
+                fl = pump.get_fill_level()
+                t_data.append(t)
+                fl_data.append(fl)
+                # print("Timer (s): {}; Fill level: {}".format(t, fl))
+                message_timer.restart()
+            result = pump.is_pumping()
+        return t_data, fl_data
 
     def configure_syringe(self, inner_dia, stroke=60.0):
         """Syringe configuration
@@ -343,7 +378,7 @@ class CetoniSP(object):
         finished = self.wait_dosage_finished(self.pump, timeout)
         assert finished
 
-    def pump_vol(self, volume, flow):
+    def pump_vol(self, volume, flow, poll_int=50):
         """Pump a specified volume at a given flow rate.
         A negative volume will be aspirated/withdrawn; a positive volume will be dispensed.
 
@@ -351,6 +386,8 @@ class CetoniSP(object):
         ----------
         volume : float
         flow : float
+        poll_int : int
+            time interval in ms for data collection
 
         Returns
         -------
@@ -365,9 +402,10 @@ class CetoniSP(object):
             print('Asked for {}, but would reach {}'.format(volume, self.syringe_fill_level - volume))
             return False
 
+        print("Pumping {} {} at {} {}".format(volume, self.vol_unit, flow, self.flow_unit))
         self.pump.pump_volume(volume, flow)
-        finished = self.wait_dosage_finished(self.pump, timeout)
-        return finished
+
+        return self.collect_position_data(self.pump, timeout, poll_int)
 
     def test_generate_flow(self):
         if not self.is_configured:
