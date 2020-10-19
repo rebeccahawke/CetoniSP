@@ -7,6 +7,10 @@ from time import time_ns
 from datetime import datetime
 import matplotlib.pyplot as plt
 
+import pyqtgraph as pg
+from msl.qt import QtWidgets, application
+import pyqtgraph.exporters
+
 
 class RFCounter(object):
 
@@ -77,6 +81,18 @@ class RFCounter(object):
         t0_s is the initial time in number of seconds passed since epoch;
         data is a list of n_meas raw values from the RF counter, in Hz
         """
+        # set up for fast graphing
+        app = application()
+        mw = QtWidgets.QMainWindow()
+        mw.setWindowTitle("Capacitor raw data")
+        cw = QtWidgets.QWidget()
+        mw.setCentralWidget(cw)
+        layout = QtWidgets.QVBoxLayout()
+        cw.setLayout(layout)
+        pw1 = pg.PlotWidget(name='Capacitor raw data')
+        curve = pw1.plot()
+        layout.addWidget(pw1)
+        mw.show()
 
         self.rfcounter.write("INPUT:LEVEL:AUTO ONCE")   # only need to get frequency level once
         self.rfcounter.write("INIT")                    # starts waiting for a trigger
@@ -91,6 +107,8 @@ class RFCounter(object):
             a = self.rfcounter.query("DATA:REM? 1,WAIT")  # a is a string
             # read one data value taken from memory to buffer; remove value from memory after reading
             data.append(float(a.strip("\n")))
+            curve.setData(data)
+            app.processEvents()
 
         if self.triggerer is not None:
             self.triggerer.stop_trigger()
@@ -157,8 +175,10 @@ if __name__ == '__main__':
     db = cfg.database()  # loads database
     equipment = db.equipment  # loads subset of database with equipment being used
 
-    n_meas = 500                # number of measurements to collect
-    trig_interval = 0.02       # trigger pulse repetition interval in seconds, using external trigger
+    trig_interval = 0.02        # trigger pulse repetition interval in seconds, using external trigger
+    meas_time = 60              # duration of measurement in seconds
+    n_meas = int(meas_time/trig_interval)      # number of measurements to collect
+    print("Number of measurements: {}".format(n_meas))
 
     rfc = RFCounter(equipment['rfc'])
     rfc.configure_rfcounter(n_meas, trig_interval)
@@ -176,8 +196,11 @@ if __name__ == '__main__':
 
     # process and plot data
     times = [x * trig_interval for x in range(0, n_meas)]
-    for a, b in zip(times, data):
-        print(datetime.fromtimestamp(t0_s + a), b)
+    with open('../data_files/RF-data_spinningslow_{}.csv'.format(t0_s), mode='w') as fp:
+        fp.write("Timestamp, Frequency (Hz)\n")
+        for a, b in zip(times, data):
+            fp.write("{}, {}\n".format(datetime.fromtimestamp(t0_s + a), b))
+        fp.close()
 
     plt.plot(times, data)
     plt.scatter(times, data)
