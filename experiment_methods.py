@@ -4,12 +4,22 @@ from time import time, time_ns, sleep
 import numpy as np
 import matplotlib.pyplot as plt
 
-from PyQt5 import QtWidgets
+import pyqtgraph as pg
+from msl.qt import QtWidgets, application
 
 from equip import CetoniSP
 from data_handling import fit_sinusoid
 
-app = QtWidgets.QApplication([])
+app = application()
+mw = QtWidgets.QMainWindow()
+mw.setWindowTitle("Syringe pump fill level")
+cw = QtWidgets.QWidget()
+mw.setCentralWidget(cw)
+layout = QtWidgets.QVBoxLayout()
+cw.setLayout(layout)
+pw1 = pg.PlotWidget(name='Syringe pump fill level')
+curve = pw1.plot()
+layout.addWidget(pw1)
 
 
 class Experimenter(object):
@@ -51,6 +61,9 @@ class Experimenter(object):
         for fl in fls:
             self.fl_data.append(fl)
 
+        curve.setData(self.t_data, self.fl_data)
+        app.processEvents()
+
     def save_data(self, file_code):
         """Save data to csv file in data_files
 
@@ -75,6 +88,15 @@ class Experimenter(object):
         print("Data file saved to {}".format(save_path))
 
     def collect_steady_state_data(self, wait_time, time_int):
+        """
+
+        Parameters
+        ----------
+        wait_time : float
+            time in seconds to collect steady-state data
+        time_int : float
+            time in ms between data points
+        """
         print("Collecting steady-state data for {} seconds".format(wait_time))
 
         nmeas = int(np.ceil(wait_time/time_int*1000))
@@ -107,6 +129,7 @@ class Experimenter(object):
 
         # collect data for {wait_time} at start_vol
         self.collect_steady_state_data(wait_time, time_int)
+        mw.show()
 
         # collect data while pumping
         t_data, fl_data = self.sp.pump_vol(vol, flow, poll_int=time_int)
@@ -115,6 +138,7 @@ class Experimenter(object):
         # collect data for {wait_time} at stop_vol
         self.collect_steady_state_data(wait_time, time_int)
 
+        mw.close()
         self.save_data("Step_{}_{}".format(vol, flow))
 
     def run_triangle_wave(self, vol, flow, num_osc, time_int=50, wait_time=5):
@@ -123,6 +147,7 @@ class Experimenter(object):
 
         # collect data for {wait_time} at start_vol
         self.collect_steady_state_data(wait_time, time_int)
+        mw.show()
 
         # collect data while generating a triangle wave
         for i in range(num_osc):
@@ -135,6 +160,7 @@ class Experimenter(object):
         self.collect_steady_state_data(wait_time, time_int)
 
         self.save_data("Tri_{}_{}".format(vol, flow))
+        mw.close()
 
     def run_osc_mode(self, A=10, T=10, cycles=1, phi=0, c=0):
 
@@ -162,7 +188,7 @@ class Experimenter(object):
 
 
 if __name__ == "__main__":
-    '''from experiment_methods import Experimenter'''
+    # from experiment_methods import Experimenter
     exp = Experimenter()
     exp.initialise_pump(1)
     exp.run_single_step(-1, 10, time_int=20, wait_time=5)
