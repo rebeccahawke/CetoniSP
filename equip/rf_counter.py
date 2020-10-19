@@ -116,15 +116,15 @@ class RFCounter(object):
         return t0_s, data
 
     def convert_cal_rf(self, data):
-        ### TODO: re-calibrate with new setup ###
-
+        # Calibration at 20/1/2020: y = 0.001135274x - 25.139001220
+        # where y = height and x is RFC value in Hz (typically 25-35 kHz)
         heights = []
 
         for raw_val in data:
-            period_cal1 = -993
-            period_cal2 = 0.0321
-            height = 1000*(float(raw_val)*period_cal1+period_cal2)  # calibration RF --> height
-            # for 'freq' reading in microseconds (not kHz as implied)
+            a = 0.001135274
+            b = -25.139001220
+
+            height = a*float(raw_val)+b
             heights.append(height)
 
         return heights
@@ -176,7 +176,7 @@ if __name__ == '__main__':
     equipment = db.equipment  # loads subset of database with equipment being used
 
     trig_interval = 0.02        # trigger pulse repetition interval in seconds, using external trigger
-    meas_time = 60              # duration of measurement in seconds
+    meas_time = 20              # duration of measurement in seconds
     n_meas = int(meas_time/trig_interval)      # number of measurements to collect
     print("Number of measurements: {}".format(n_meas))
 
@@ -189,19 +189,24 @@ if __name__ == '__main__':
     rfc.set_triggerer(trig)
 
     # take readings
-    t0_s, data = rfc.read_n_raw_readings(n_meas)
+    t0_s, raw_data = rfc.read_n_raw_readings(n_meas)
 
     rfc.close()
     trig.close_comms()
 
+    height_data = rfc.convert_cal_rf(raw_data)
+
     # process and plot data
     times = [x * trig_interval for x in range(0, n_meas)]
-    with open('../data_files/RF-data_spinningslow_{}.csv'.format(t0_s), mode='w') as fp:
-        fp.write("Timestamp, Frequency (Hz)\n")
-        for a, b in zip(times, data):
-            fp.write("{}, {}\n".format(datetime.fromtimestamp(t0_s + a), b))
+    with open('../data_files/RF-data_{}.csv'.format(t0_s), mode='w') as fp:
+        fp.write("Timestamp, Frequency (Hz), Height (mm)\n")
+        for a, b, c in zip(times, raw_data, height_data):
+            fp.write("{}, {}\n".format(datetime.fromtimestamp(t0_s + a), b, c))
         fp.close()
 
-    plt.plot(times, data)
-    plt.scatter(times, data)
+    plt.plot(times, height_data)
+    plt.scatter(times, height_data)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Position (mm)")
+    plt.tight_layout()
     plt.show()
