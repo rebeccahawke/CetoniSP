@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from time import time, time_ns, sleep
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,7 +40,8 @@ class Experimenter(object):
         self.sp.connect_to_pump("neMESYS_Low_Pressure_1_Pump")
 
         ### essential start-up routine ###
-        self.sp.configure_syringe(inner_dia=23.0329, stroke=60.0)  # 25 mL syringe
+        self.sp.configure_syringe(inner_dia=23.0329, stroke=30.0)  # 25 mL syringe
+        # half usual stroke as syringe is pushed fully towards valve end (stroke usually 60.0)
         self.sp.set_units('mL', 'mL/min')
         self.sp.calibrate_pump()  # Only run this command with no syringe installed
 
@@ -62,6 +64,25 @@ class Experimenter(object):
         for fl in fls:
             self.fl_data.append(fl)
 
+    def save_data(self, file_code):
+        """Save data to csv file in data_files
+
+        Parameters
+        ----------
+        file_code : str
+            hint for what the data includes
+
+        Returns
+        -------
+
+        """
+
+        with open('./data_files/{}_{}.csv'.format(file_code, self.t_data[0]), mode='w') as fp:
+            fp.write("Timestamp, SP Position (mL)\n")
+            for a, b in zip(self.t_data, self.fl_data):
+                fp.write("{}, {}\n".format(datetime.fromtimestamp(a), b))
+            fp.close()
+
     def collect_steady_state_data(self, wait_time, time_int):
         print("Collecting steady-state data for {} seconds".format(wait_time))
 
@@ -73,17 +94,16 @@ class Experimenter(object):
             self.fl_data.append(fl)
             sleep(time_int/1000)
 
-    def run_single_step(self, start_vol, stop_vol, flow, time_int=50, wait_time=5):
+    def run_single_step(self, vol, flow, time_int=50, wait_time=5):
         """Aspirate or dispense a given volume at the specified flow rate
         while recording the syringe fill level according to the system clock
 
         Parameters
         ----------
-        start_vol : float
-            initial volume of syringe
-        stop_vol : float
-            final volume of syringe
+        vol : float
+            volume to dispense (positive volume) or aspirate (negative volume)
         flow : float
+            flow in units set for syringe pump
         time_int : float
             approximate time in ms between data points
         wait_time : float
@@ -92,14 +112,11 @@ class Experimenter(object):
         Returns
         -------
         """
-        self.sp.set_syringe_level(start_vol)
-
         self.clear_data()
 
         # collect data for {wait_time} at start_vol
         self.collect_steady_state_data(wait_time, time_int)
 
-        vol = start_vol - stop_vol      # because a 'positive volume' is dispensed
         # collect data while pumping
         t_data, fl_data = self.sp.pump_vol(vol, flow, poll_int=time_int)
         self.update_data(t_data, fl_data)
@@ -107,11 +124,26 @@ class Experimenter(object):
         # collect data for {wait_time} at stop_vol
         self.collect_steady_state_data(wait_time, time_int)
 
-        print(self.t_data, self.fl_data)
+        self.save_data("Step_{}_{}".format(vol, flow))
 
-    def run_triangle_wave(self):
+    def run_triangle_wave(self, vol, flow, num_osc, time_int=50, wait_time=5):
 
-        print('triangle wave')
+        self.clear_data()
+
+        # collect data for {wait_time} at start_vol
+        self.collect_steady_state_data(wait_time, time_int)
+
+        # collect data while generating a triangle wave
+        for i in range(num_osc):
+            t_data, fl_data = self.sp.pump_vol(vol, flow, poll_int=time_int)
+            self.update_data(t_data, fl_data)
+            t_data, fl_data = self.sp.pump_vol(-vol, flow, poll_int=time_int)
+            self.update_data(t_data, fl_data)
+
+        # collect data for {wait_time} at stop_vol
+        self.collect_steady_state_data(wait_time, time_int)
+
+        self.save_data("Tri_{}_{}".format(vol, flow))
 
     def run_osc_mode(self, A=10, T=10, cycles=1, phi=0, c=0):
 
@@ -140,5 +172,8 @@ if __name__ == "__main__":
     '''from experiment_methods import Experimenter'''
     exp = Experimenter()
     exp.initialise_pump(1)
-    exp.run_single_step(1, 2, 10, time_int=20, wait_time=5)
+    exp.run_single_step(-1, 10, time_int=20, wait_time=5)
     exp.plot_data()
+    exp.run_triangle_wave(1, 15, 2, time_int=20, wait_time=5)
+    exp.plot_data()
+    exp.finish()
