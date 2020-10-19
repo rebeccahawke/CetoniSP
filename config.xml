@@ -1,16 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
   <msl>
-    <!--
-      Use PyVISA-py as the PyVISA backend library.
-      Allowed values are: @ni, @py, @sim, /path/to/lib\@ni
-    -->
-    <pyvisa_library>@py</pyvisa_library>
 
-    <!--
-      Specify the equipment that is being used to perform the measurement and assign an
-      "alias" that you want to use to associate for each equipment.
-    -->
     <equipment alias="rfc" manufacturer="Keysight" model="53210A" serial="MY57510158"/>
+    <equipment alias="wfg" manufacturer="Keysight" model="33522A" serial="MY50005063"/>
 
     <!-- Specify the Equipment-Register Databases to load equipment records from. -->
     <registers>
