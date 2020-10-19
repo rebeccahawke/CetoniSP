@@ -11,19 +11,6 @@ from data_handling import fit_sinusoid
 
 app = QtWidgets.QApplication([])
 
-'''
-from msl.equipment import Config
-
-config = r'config.xml'
-cfg = Config(config)               # loads cfg file
-db = cfg.database()           # loads database
-equipment = db.equipment      # loads subset of database with equipment being used
-
-
-for record in equipment():
-    print(record)
-'''
-
 
 class Experimenter(object):
 
@@ -76,12 +63,16 @@ class Experimenter(object):
         -------
 
         """
-
-        with open('./data_files/{}_{}.csv'.format(file_code, self.t_data[0]), mode='w') as fp:
+        save_path = os.path.join(
+                os.path.dirname(__file__),
+                'data_files/{}_{}.csv'.format(file_code, self.t_data[0]))
+        with open(save_path, mode='w') as fp:
             fp.write("Timestamp, SP Position (mL)\n")
             for a, b in zip(self.t_data, self.fl_data):
                 fp.write("{}, {}\n".format(datetime.fromtimestamp(a), b))
             fp.close()
+
+        print("Data file saved to {}".format(save_path))
 
     def collect_steady_state_data(self, wait_time, time_int):
         print("Collecting steady-state data for {} seconds".format(wait_time))
@@ -161,6 +152,8 @@ class Experimenter(object):
     def plot_data(self):
         plt.plot(self.t_data, self.fl_data)
         plt.scatter(self.t_data, self.fl_data)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Syringe Fill Level (mL)")
         plt.show()
 
     def finish(self):
