@@ -80,9 +80,9 @@ class Experimenter(object):
                 os.path.dirname(__file__),
                 'data_files/{}_{}.csv'.format(file_code, self.t_data[0]))
         with open(save_path, mode='w') as fp:
-            fp.write("Timestamp, SP Position (mL)\n")
+            fp.write("Timestamp,SP Position (mL)\n")
             for a, b in zip(self.t_data, self.fl_data):
-                fp.write("{}, {}\n".format(datetime.fromtimestamp(a), b))
+                fp.write("{},{}\n".format(datetime.fromtimestamp(a), b))
             fp.close()
 
         print("Data file saved to {}".format(save_path))
