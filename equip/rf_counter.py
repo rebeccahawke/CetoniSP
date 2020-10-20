@@ -175,6 +175,7 @@ if __name__ == '__main__':
     db = cfg.database()  # loads database
     equipment = db.equipment  # loads subset of database with equipment being used
 
+    save = False
     trig_interval = 0.02        # trigger pulse repetition interval in seconds, using external trigger
     meas_time = 20              # duration of measurement in seconds
     n_meas = int(meas_time/trig_interval)      # number of measurements to collect
@@ -198,11 +199,14 @@ if __name__ == '__main__':
 
     # process and plot data
     times = [x * trig_interval for x in range(0, n_meas)]
-    with open('../data_files/RF-data_{}.csv'.format(t0_s), mode='w') as fp:
-        fp.write("Timestamp,Frequency (Hz),Height (mm)\n")
-        for a, b, c in zip(times, raw_data, height_data):
-            fp.write("{},{},{}\n".format(datetime.fromtimestamp(t0_s + a), b, c))
-        fp.close()
+    if save:
+        savepath = r'../data_files/RF-data_{}.csv'.format(t0_s)
+        with open(savepath, mode='w') as fp:
+            fp.write("Timestamp,Frequency (Hz),Height (mm)\n")
+            for a, b, c in zip(times, raw_data, height_data):
+                fp.write("{},{},{}\n".format(datetime.fromtimestamp(t0_s + a), b, c))
+            fp.close()
+        print("Data saved to {}".format(savepath))
 
     plt.plot(times, height_data)
     plt.scatter(times, height_data)
