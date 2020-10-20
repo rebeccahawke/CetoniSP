@@ -199,9 +199,9 @@ if __name__ == '__main__':
     # process and plot data
     times = [x * trig_interval for x in range(0, n_meas)]
     with open('../data_files/RF-data_{}.csv'.format(t0_s), mode='w') as fp:
-        fp.write("Timestamp, Frequency (Hz), Height (mm)\n")
+        fp.write("Timestamp,Frequency (Hz),Height (mm)\n")
         for a, b, c in zip(times, raw_data, height_data):
-            fp.write("{}, {}\n".format(datetime.fromtimestamp(t0_s + a), b, c))
+            fp.write("{},{},{}\n".format(datetime.fromtimestamp(t0_s + a), b, c))
         fp.close()
 
     plt.plot(times, height_data)
