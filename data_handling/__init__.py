@@ -1,1 +1,1 @@
-from .plot_data import fit_sinusoid
+from data_handling.plot_data import fit_sinusoid, fit_quadratic

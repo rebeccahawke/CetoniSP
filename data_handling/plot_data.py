@@ -7,6 +7,33 @@ import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 
+def quadratic(x, a, b, c):
+    return a * x**2 + b * x + c
+
+def fit_quadratic(x, y, a, b, c):
+
+    plt.scatter(x, y)
+
+    # Fit a quadratic to the data
+    pars, cov = curve_fit(f=quadratic, xdata=x, ydata=y, p0=[a, b, c], bounds=(-np.inf, np.inf))
+
+    print(pars)
+
+    # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
+    stdevs = np.sqrt(np.diag(cov))
+    print("Standard deviations: {}".format(stdevs))
+
+    # Calculate the residuals
+    res = y - quadratic(x, *pars)
+
+    plt.scatter(x, quadratic(x, *pars), label='Fit: {:.3g} x$^2$ + {:.3g} x + {:.3g}'.format(*pars))
+    plt.title("Calibration for LVDT from RFCounter data")
+    plt.xlabel("LVDT voltage (V)")
+    plt.ylabel("Height (mm)")
+    plt.legend()
+    plt.show()
+
+
 # filename = r'C:\Users\r.hawke\PycharmProjects\CetoniSP\10-1-5_osc.xlsx'
 # A = 10
 # T = 1
@@ -80,8 +107,8 @@ def plot_sp_rfc_data(SP_csv, RFC_csv, savepath=None):
 
 
 if __name__ == "__main__":
-    rf = "RF-data_1603165352.5602.csv"
-    sp = "Tri_0.1_30_1603165362.5242.csv"
+    rf = "RF-data_1603424127.0928001.csv"
+    sp = "Tri_0.3_36_1603424129.4968002.csv"
     plot_sp_rfc_data(
         os.path.join(r'../data_files', sp),
         os.path.join(r'../data_files', rf),
