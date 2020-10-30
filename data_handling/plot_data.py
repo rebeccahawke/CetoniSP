@@ -7,6 +7,33 @@ import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 
+def linear(x, a, b):
+    return a * x + b
+
+def fit_linear(x, y, a, b):
+
+    plt.scatter(x, y)
+
+    # Fit a quadratic to the data
+    pars, cov = curve_fit(f=linear, xdata=x, ydata=y, p0=[a, b], bounds=(-np.inf, np.inf))
+
+    print(pars)
+
+    # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
+    stdevs = np.sqrt(np.diag(cov))
+    print("Standard deviations: {}".format(stdevs))
+
+    # Calculate the residuals
+    res = y - linear(x, *pars)
+
+    plt.scatter(x, linear(x, *pars), label='Fit: {:.3g} x + {:.3g}'.format(*pars))
+    plt.title("Calibration for LVDT from RFCounter data")
+    plt.xlabel("LVDT voltage (V)")
+    plt.ylabel("Height (mm)")
+    plt.legend()
+    plt.show()
+
+
 def quadratic(x, a, b, c):
     return a * x**2 + b * x + c
 
