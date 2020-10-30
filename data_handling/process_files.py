@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from openpyxl import load_workbook, Workbook
 
-from data_handling.plot_data import fit_quadratic
+from data_handling.plot_data import fit_linear, fit_quadratic, fit_sinusoid
 
 
 def convert_cal_rf(data):
@@ -212,6 +212,9 @@ def combine_lvdt_rfc_data(folder):
 
 
 def get_LVDTcal_from_RFCcal(datafile):
+    # used with
+    # folder = r'I:\MSL\Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201023_RFC-LVDT_IgorData'
+    # fname = "CollatedData.xlsx"
 
     df = pd.read_excel(datafile)
     # headers = list(df.columns.values.tolist())
@@ -223,30 +226,55 @@ def get_LVDTcal_from_RFCcal(datafile):
     fit_quadratic(df["LVDT"], cal_height_rf, 0.1, 1, 0.1)
 
     # returns calibration [a, b, c] parameters: [-0.03542046  1.07974847 -0.39624465]
+    # linear fit returns [ 0.82622535 -0.01726006]; Standard deviations: [0.00022915 0.00075441] but not a great fit.
+
+
+def plot_rfc_lvdt():
+    folder = r'I:\MSL\Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201023_RFC-LVDT_IgorData'
+
+    rf = "LH_hgt_scan0009.csv"
+    lf = "dP_volt_scan0009.csv"
+
+    rfc_data = pd.read_csv(os.path.join(folder, rf), header=None)
+    rfc_data.columns = ["RF"]
+    print(rfc_data)
+
+    lvdt_data = pd.read_csv(os.path.join(folder, lf), header=None)
+    lvdt_data.columns = ["LVDT"]
+    print(lvdt_data)
+
+    plt.plot(convert_cal_rf(rfc_data["RF"]), label="RF")
+    plt.plot(convert_cal_lvdt(lvdt_data["LVDT"]), label="LVDT")
+    plt.xlabel("Measurement number")
+    # plt.xlabel("Frequency (Hz) converted to Height (mm)")
+    plt.ylabel("Height (mm)")
+    plt.tight_layout()
+    plt.savefig(os.path.join(folder, lf.strip(".csv")+"_overTime.png"))
+
+    plt.show()
+
+
+def fit_sine_to_height():
+    pass
+
 
 
 if __name__ == "__main__":
-    # folder = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 TriangleWaves 0.5mL"
-    # folder = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 TriangleWaves 1Hz"
-    folder = r'I:\MSL\Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201023_RFC-LVDT_IgorData'
-    fname = "CollatedData.xlsx"
+    folder_0p5 = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 TriangleWaves 0.5mL"
+    folder_1Hz = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 TriangleWaves 1Hz"
+    fname = "Tri_0.1_12_1603423105.3048003_LVDT.xlsx"
 
-    get_LVDTcal_from_RFCcal(os.path.join(folder, fname))
+    sp1, df2 = read_in_data(folder, fname)
 
+    rfcA = convert_cal_rf(df2['Frequency (Hz)'][2000:4000])
+    rfcB = df2['Height (mm)'][2000:4000]
+    lvdtA = df2['LVDT (V)'][2000:4000]
+    lvdtB = convert_cal_lvdt(lvdtA, offset=-3.9)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    plt.plot(rfcB, label="RF_asHeight")
+    plt.plot(rfcA, label="RF_fromFreq")
+    plt.plot(lvdtA, label="LVDT_V")
+    plt.plot(lvdtB, label="LVDT_asHeight")
+    plt.legend()
+    plt.show()
 
