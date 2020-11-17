@@ -6,8 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.optimize import curve_fit
+from openpyxl import Workbook
 
-from data_handling.process_files import get_all_LVDTxlsx_fnames
+from data_handling.process_files import get_all_fnames
+from data_handling.plot_data import linear, fit_linear
 
 msl_orange = '#f15a29'
 
@@ -15,7 +17,7 @@ path = r'I:\MSL\Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow
 datapath = r'C:\Users\r.hawke\Desktop\4OctFiles\SyringePumpTests\20190925'
 
 """Driving (z_d) functions"""
-max_n = 1000
+max_n = 100
 
 def ad_n(t, n, A0, omega):
     return A0*omega * np.cos(n*omega*t)
@@ -50,12 +52,12 @@ def zd(t, A0, omega):
 """Response (z_r) functions"""
 def A_el_n(n, A0, omega, omega0, Qm):
     diff = omega0**2 - (n*omega)**2
-    c_m = omega0 / (Qm)
+    c_m = omega0 / Qm
     return -A0 * omega * diff / (diff**2 + (c_m*n*omega)**2)
 
 def A_inel_n(n, A0, omega, omega0, Qm):
     diff = omega0**2 - (n*omega)**2
-    c_m = omega0 / (Qm)
+    c_m = omega0 / Qm
     return -A0*omega*c_m*n*omega / (diff**2 + (c_m*n*omega)**2)
 
 def zr_n(t, n, A0, omega, omega0, Qm):
@@ -123,7 +125,7 @@ def vary_omega(path=None, figname=None):
     for x in relfreq:
         print(x)
         omega = omega0 * x
-        z_d = zd(t, A0, omega)
+        z_d = z(t, A0, omega, omega0, Qm)
         z_r = zr(t, A0, omega, omega0, Qm)
         maxR.append(max(z_r))
         maxD.append(max(z_d))
@@ -143,15 +145,18 @@ def vary_omega(path=None, figname=None):
     plt.show()
     plt.clf()
 
+
 """selected omegas"""
-# for x,c in zip([10, 3, 2.5, 2, 1, 0.5],color):
-#     omega = omega0 * 1/x #/(2**x) #+ (x-(n_col+1)/2)/n_col)
-#     plt.plot(t, z(t, A0, omega, omega0, Qm), label="period (s) = "+str(x), c=c)
-#
-# plt.legend()
-# figname='z_truefs_1Hz-f0_Triangle'
-#
-# plt.show()
+def plot_some_omegas(figname=None):
+    for x,c in zip([10, 3, 2.5, 2, 1, 0.5],color):
+        omega = omega0 * 1/x #/(2**x) #+ (x-(n_col+1)/2)/n_col)
+        plt.plot(t, z(t, A0, omega, omega0, Qm), label="period (s) = "+str(x), c=c)
+
+    plt.legend()
+    if figname is None:
+        figname='z_truefs_1Hz-f0_Triangle'
+
+    plt.show()
 
 """Delta driving force  # # Driving with square wave velocity (many n=odd sinusoids)"""
 # plt.plot(t, 0.0015*a(t, A0, omega), color='k', alpha=0.5)
@@ -219,49 +224,46 @@ def vary_omega(path=None, figname=None):
 
 
 """Fit response function to real data"""
-def sin_fit(t, A, f):
-    # f = 0.9575  # driving force frequency (set by syringe pump)
+def sin_fit(t, A, f, phi):
+    # f = driving force frequency as set by syringe pump
     omega = 2 * np.pi * f  # driving force angular frequency
-    return A * np.sin(omega*t)
-
-def z_fit(t, A, f, omega0, Qm, delta):
-    t2 = t + delta      # add a phase shift
-    omega = 2 * np.pi * f  # driving force angular frequency
-    return z(t2, A, omega, omega0, Qm)
+    return A * np.sin(omega * t + phi)
 
 
-def fit_response(A0, omega0, Qm):
-    # plot driving, relative and response displacements
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, )
+def fit_response_single_sine(folder, filename, A0=1., f=1., ):
+    # fit with single sinusoid
 
-    path = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files/2020-10-23 TriangleWaves 1Hz/Tri_0.3_36_1603424129.4968002_LVDT.xlsx"
+    num_pts = 1500
+    t = np.linspace(0, num_pts*0.02, num=num_pts)
+
+    path = os.path.join(folder, filename)
     df = pd.read_excel(path, sheet_name="RFC data")
-    z_real = df["LVDT (V)"][2008:4008] - 6.3
+    t0 = 2400
 
-    t = np.linspace(0, 2000*0.02, num=2000)
+    # find best linear fit
+    linpars = fit_linear(t, df["LVDT (mm)"][t0:t0+num_pts])
+    # subtract linear fall rate
+    z_real = df["LVDT (mm)"][t0:t0+num_pts] - linear(t, *linpars)
+    # plt.plot(t, z_real)
+    # plt.show()
 
     # Fit to a pure sinusoid
-    pars, cov = curve_fit(f=sin_fit, xdata=t, ydata=z_real, p0=[-2.9, 0.9575], bounds=(-np.inf, np.inf))
-    # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
-    stdevs = np.sqrt(np.diag(cov))
-    # Calculate the residuals
+    pars, cov = curve_fit(f=sin_fit, xdata=t, ydata=z_real, p0=[A0, f, 0.1], bounds=(-np.inf, np.inf))
+    # # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
+    # stdevs = np.sqrt(np.diag(cov))
+    # TODO: Calculate a sum square of the residuals as a measure of how 'clean' the sinusoid is
     res = z_real - sin_fit(t, *pars)
-    print("Pars {} {}\nCov {}\nStdevs {}".format(*pars, cov, stdevs))
+    res_sum = sum(i * i for i in res)
+    # print("Pars {} {} {} {}\nCov {}\nStdevs {}".format(*pars, cov, stdevs))
 
-    # Fit using z above
-    z_pars, z_cov = curve_fit(f=z_fit, xdata=t, ydata=z_real, p0=[pars[0], 2 * np.pi * pars[1], 8.0, 20, 0.2], bounds=(-np.inf, np.inf))
-    # using -z_real as suspecting definition of displacement might be the other way around
-    print(z_pars)
-    # z_theor = z(t, A0, omega, omega0, Qm)
-
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, )
     ax1.plot(t, z_real, label="Expt")
-    ax1.plot(t, sin_fit(t, *pars), label='Fit')
 
-    ax2.plot(t, -z_real/7, label="Expt")
-    ax2.plot(t, z(t, *z_pars[:-1]), label="Model")
+    ax2.plot(t, z_real, label="Expt")
+    ax2.plot(t, sin_fit(t, *pars), label="Fit")
 
-    ax3.plot(t, z_real - sin_fit(t, *pars), label='Difference sin')
-    ax3.plot(t, -z_real/7 - z(t, *z_pars[:-1]), label="Difference model")
+    ax3.plot(t, z_real - sin_fit(t, *pars), label='Residual sin')
+    # ax3.plot(t, z_real - z_fit(t, *z_pars), label="Difference model")
 
     for ax in [ax1, ax2, ax3]:
         ax.legend()
@@ -269,7 +271,64 @@ def fit_response(A0, omega0, Qm):
     ax3.set_xlabel("Time (s)")
     ax2.set_ylabel("Displacement")
 
-    plt.show()
+    plt.savefig(filename.strip(".xlsx")+".png")
+    # plt.show()
+    plt.close()
+
+    return pars, linpars, res_sum
+
+
+def z_fit(t, A, f, omega0, Qm, delta, fall):
+    t2 = t + delta      # add a phase shift
+    omega = 2 * np.pi * f  # driving force angular frequency
+    return z(t2, A, omega, omega0, Qm) + fall*t2
+
+
+def fit_response(folder, filename, A0=1., f=1., omega0=1., Qm=10.):
+    # plot driving, relative and response displacements
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, )
+
+    num_pts = 1500
+    t = np.linspace(0, num_pts*0.02, num=num_pts)
+
+    path = os.path.join(folder, filename)
+    df = pd.read_excel(path, sheet_name="RFC data")
+    t0 = 2300
+    z_real = df["LVDT (mm)"][t0:t0+num_pts] - np.average(df["LVDT (mm)"][t0:t0+num_pts])
+    # plt.plot(t, z_real)
+    # plt.show()
+
+    # Fit using z above
+    try:
+        z_pars, z_cov = curve_fit(f=z_fit, xdata=t, ydata=z_real, p0=[A0, f, omega0, Qm, 0.1, -3e-03], bounds=(-np.inf, np.inf))
+
+        # print("A0: {}, f: {}, omega0: {}, Qm: {}, delta: {}, fall: {}".format(*z_pars))
+        # z_theor = z(t, A0, omega, omega0, Qm)
+
+        ax1.plot(t, z_real, label="Expt")
+        # ax1.plot(t, sin_cos_fit(t, *pars), label='Fit')
+
+        ax2.plot(t, z_real, label="Expt")
+        ax2.plot(t, z_fit(t, *z_pars), label="Model")
+
+        # ax3.plot(t, z_real - sin_fit(t, *pars), label='Difference sin')
+        ax3.plot(t, z_real - z_fit(t, *z_pars), label="Difference model")
+
+        for ax in [ax1, ax2, ax3]:
+            ax.legend()
+
+        ax3.set_xlabel("Time (s)")
+        ax2.set_ylabel("Displacement")
+
+        plt.show()
+
+        return z_pars
+
+    except RuntimeError as e:
+        # print(e)
+        plt.plot(t, z_real)
+        plt.show()
+        return e, [], [], [], [], []
 
 
 def do_fft(folder, fname):
@@ -281,7 +340,8 @@ def do_fft(folder, fname):
     # Get data
     path = os.path.join(folder, fname)
     df = pd.read_excel(path, sheet_name="RFC data")
-    z_real = df["LVDT (V)"][2100:4100] - 6.3
+
+    z_real = df["LVDT (V)"][2100:4100] - np.average(df["LVDT (V)"][2100:4100])
     t = np.linspace(0, 2000 * 0.02, num=2000)
 
     # ax1.plot(t, z_real)
@@ -320,13 +380,15 @@ def do_fft(folder, fname):
 def plot_all_FFTs(folder):
 
     ffts = []
-    for f in get_all_LVDTxlsx_fnames(folder):
+    for f in get_all_fnames(folder, "Tri", endpattern="_LVDT.xlsx"):
+        print(f)
         ffts.append(do_fft(folder, f))
 
     n_col = len(ffts)
     color = plt.cm.rainbow(np.linspace(0, 1, n_col))
     for i, dataset in enumerate(ffts):
         plt.semilogy(dataset[2], abs(dataset[3]), label="{} @ {}".format(dataset[0], dataset[1]), c=color[i])
+        # print(np.argmax(max(abs(dataset[3]))))
 
     plt.title('Fourier transform depicting the frequency components')
     plt.xlabel('Frequency (Hz)')
@@ -341,25 +403,54 @@ if __name__ == "__main__":
     num_pts = 100
     t = np.linspace(0, t_final, int(num_pts * t_final + 1))
 
-    f0 = 1  # natural frequency, which is around 1 Hz for current setup
+    f0 = 1.035  # natural frequency, which is around 1 Hz for current setup
     omega0 = 2 * np.pi * f0
 
-    Q = 10  # Quality factor - higher for low damping and longer oscillations
+    Q = 7  # Quality factor - higher for low damping and longer oscillations
     m = 2  # Mass of floating elements, kg
     Qm = Q * m
     # omega1 = np.sqrt(omega0**2 - 0.5 * gamma**2)
 
-    f = 1  # driving force frequency
+    f = 0.933  # driving force frequency
     omega = 2 * np.pi * f  # driving force angular frequency
-    A0 = 1.15
+    A0 = 0.1
 
     psi = 4
 
-    fit_response(A0, omega0, Qm)
+    folder_0p05 = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201109 TriangleWaves 0.05mL"
 
-    folder_0p5 = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 TriangleWaves 0.5mL"
-    folder_1Hz = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 TriangleWaves 1Hz"
+    # plot_all_FFTs(folder_0p05)
+    #
+    # filename = "Tri_0.05_18_1604882252.6072_LVDT.xlsx"
+    # vol = float(filename.split("_")[1])
+    # flo = float(filename.split("_")[2])
+    # f = 1 / (2 * vol / flo * 60 + 0.03)
+    #
+    # pars, linpars = fit_response_single_sine(folder_0p05, filename, A0=A0, f=f, )
+    # # returns [A, f, phi], [fall, offset]
+    # print([filename, pars[0], pars[1], pars[2], linpars[0], linpars[1]])
 
-    # plot_all_FFTs(folder_0p5)
+
+    fout = Workbook()
+    sh = fout.active
+
+    files = get_all_fnames(folder_0p05, "Tri_", endpattern="_LVDT.xlsx")
+
+    # files = ["Tri_0.05_18_1604882252.6072_LVDT.xlsx", "Tri_0.05_15_1604882091.3002_LVDT.xlsx"]
+
+    for filename in files:
+        print(filename)
+
+        vol = float(filename.split("_")[1])
+        flo = float(filename.split("_")[2])
+        f = 1/(2*vol/flo*60+0.025)
+
+        pars, linpars, res_sum = fit_response_single_sine(folder_0p05, filename, A0=A0, f=f, )
+        # returns [A, f, phi], [fall, offset]
+        sh.append([filename, pars[0], pars[1], pars[2], linpars[0], linpars[1], res_sum])
+        # print("{}, A0: {}, f: {}, omega0: {}, Qm: {}, delta: {}, fall: {}".format(filename, *z_pars))
+
+    fout.save("SineOsc.xlsx")
+
 
 
