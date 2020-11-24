@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
   <msl>
 
-    <equipment alias="rfc" manufacturer="Keysight" model="53210A" serial="MY57510158"/>
+    <equipment alias="rfc_lh" manufacturer="Keysight" model="53210A" serial="MY57510166"/>
+    <equipment alias="rfc_rh" manufacturer="Keysight" model="53210A" serial="MY57510158"/>
     <equipment alias="wfg" manufacturer="Keysight" model="33522A" serial="MY50005063"/>
     <equipment alias="sylvac75" manufacturer="Sylvac" model="DialGauge" serial="16575"/>
 
@@ -12,7 +13,7 @@
         database belongs to.
       -->
       <register team="M&amp;P">
-          <path>I:\MSL\Private\MAP\Equipment register\Equipment Register.xlsx</path>
+          <path>G:\Shared drives\MSL - MAP\Equipment register\Equipment Register.xlsx</path>
           <!--
             If there are multiple Sheets in the Excel database then you must specify the
             name of the Sheet that contains the equipment records. This Excel database
@@ -26,7 +27,7 @@
     <!-- Specify the Connections Databases to load connection records from. -->
     <connections>
       <connection>
-        <path>I:\MSL\Private\MAP\Equipment register\Equipment Register.xlsx</path>
+        <path>G:\Shared drives\MSL - MAP\Equipment register\Equipment Register.xlsx</path>
         <!--
           Must also specify which Sheet in this Excel database contains the connection records.
           This "Equipment Register.xls" file also contains an "Equipment" Sheet, see the

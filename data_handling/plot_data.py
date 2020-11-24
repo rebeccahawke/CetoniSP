@@ -3,41 +3,45 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-import openpyxl
-from openpyxl.utils.dataframe import dataframe_to_rows
 
 
-def linear(x, a, b):
-    return a * x + b
 
-def fit_linear(x, y, a, b):
+def linear(x, a=1, b=1):
+    return [a * x_ + b for x_ in x]
+
+def fit_linear(x, y, a=1, b=1):
 
     plt.scatter(x, y)
 
     # Fit a quadratic to the data
     pars, cov = curve_fit(f=linear, xdata=x, ydata=y, p0=[a, b], bounds=(-np.inf, np.inf))
 
-    print(pars)
+    # print(pars)
 
     # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
     stdevs = np.sqrt(np.diag(cov))
-    print("Standard deviations: {}".format(stdevs))
+    # print("Standard deviations: {}".format(stdevs))
 
     # Calculate the residuals
-    res = y - linear(x, *pars)
+    fit = linear(x, *pars)
+    res = [y_ - x_ for y_, x_ in zip(y, fit)]
 
-    plt.scatter(x, linear(x, *pars), label='Fit: {:.3g} x + {:.3g}'.format(*pars))
+    plt.plot(x, linear(x, *pars), label='Fit: {:.3g} x + {:.3g}'.format(*pars))
+    plt.scatter(x, res, )
     plt.title("Calibration for LVDT from RFCounter data")
     plt.xlabel("LVDT voltage (V)")
     plt.ylabel("Height (mm)")
     plt.legend()
     plt.show()
+    plt.close()
+
+    return pars
 
 
-def quadratic(x, a, b, c):
-    return a * x**2 + b * x + c
+def quadratic(x, a=0.1, b=1, c=10):
+    return [a * x_**2 + b * x_ + c for x_ in x]
 
-def fit_quadratic(x, y, a, b, c):
+def fit_quadratic(x, y, a=0.1, b=1, c=10):
 
     plt.scatter(x, y)
 
@@ -51,15 +55,79 @@ def fit_quadratic(x, y, a, b, c):
     print("Standard deviations: {}".format(stdevs))
 
     # Calculate the residuals
-    res = y - quadratic(x, *pars)
+    fit = quadratic(x, *pars)
+    res = [y_ - x_ for y_, x_ in zip(y, fit)]
 
-    plt.scatter(x, quadratic(x, *pars), label='Fit: {:.3g} x$^2$ + {:.3g} x + {:.3g}'.format(*pars))
+    plt.plot(x, quadratic(x, *pars), label='Fit: {:.3g} x$^2$ + {:.3g} x + {:.3g}'.format(*pars))
+    plt.scatter(x, res)
     plt.title("Calibration for LVDT from RFCounter data")
     plt.xlabel("LVDT voltage (V)")
     plt.ylabel("Height (mm)")
     plt.legend()
     plt.show()
 
+    return pars
+
+
+def cubic(x, a=0.1, b=1, c=10., d=100):
+    return [a * x_**3 + b * x_**2 + c * x_ + d for x_ in x]
+
+def fit_cubic(x, y, a=0.1, b=1, c=10, d=100):
+
+    plt.scatter(x, y)
+
+    # Fit a quadratic to the data
+    pars, cov = curve_fit(f=cubic, xdata=x, ydata=y, p0=[a, b, c, d], bounds=(-np.inf, np.inf))
+
+    print(pars)
+
+    # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
+    stdevs = np.sqrt(np.diag(cov))
+    print("Standard deviations: {}".format(stdevs))
+
+    # Calculate the residuals
+    fit = cubic(x, *pars)
+    res = [y_ - x_ for y_, x_ in zip(y, fit)]
+
+    plt.plot(x, cubic(x, *pars), label='Fit: {:.3g} x$^3$ + {:.3g} x$^2$ + {:.3g} x + {:.3g}'.format(*pars))
+    plt.scatter(x, res)
+    plt.title("Calibration for LVDT from RFCounter data")
+    plt.xlabel("LVDT voltage (V)")
+    plt.ylabel("Height (mm)")
+    plt.legend()
+    plt.show()
+
+    return pars
+
+def quartic(x, a=0.1, b=1, c=10., d=100, e=1000):
+    return [a * x_**4 + b * x_**3 + c * x_**2 + d * x_ + e for x_ in x]
+
+def fit_quartic(x, y, a=0.1, b=1, c=10., d=100, e=1000):
+
+    fig = plt.scatter(x, y, label="Raw data")
+
+    # Fit a quadratic to the data
+    pars, cov = curve_fit(f=quartic, xdata=x, ydata=y, p0=[a, b, c, d, e], bounds=(-np.inf, np.inf))
+
+    print(pars)
+
+    # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
+    stdevs = np.sqrt(np.diag(cov))
+    print("Standard deviations: {}".format(stdevs))
+
+    # Calculate the residuals
+    fit = quartic(x, *pars)
+    res = [y_ - x_ for y_, x_ in zip(y, fit)]
+
+    plt.scatter(x, quartic(x, *pars), label='Fit: {:.3g} x$^4$ + {:.3g} x$^3$ + {:.3g} x$^2$ + {:.3g} x + {:.3g}'.format(*pars))
+    plt.scatter(x, res, label="Residuals")
+    plt.title("Calibration for RFCounter from dial gauge measurements")
+    plt.xlabel("Height (mm)") #LVDT voltage (V)")
+    plt.ylabel("RF Counter frequency (Hz)")
+    plt.legend()
+    plt.show()
+
+    return pars
 
 # filename = r'C:\Users\r.hawke\PycharmProjects\CetoniSP\10-1-5_osc.xlsx'
 # A = 10
@@ -71,7 +139,6 @@ def fit_quadratic(x, y, a, b, c):
 
 def sinusoid(x, A, T, phi, c):
     return A * np.sin(2 * np.pi * x / T + phi) + c
-
 
 def fit_sinusoid(filename, col, A, T, phi, c):
 
@@ -97,40 +164,7 @@ def fit_sinusoid(filename, col, A, T, phi, c):
     plt.show()
 
 
-def plot_sp_rfc_data(SP_csv, RFC_csv, savepath=None):
 
-    sp_data = pd.read_csv(SP_csv)
-    rfc_data = pd.read_csv(RFC_csv)
-
-    fig, (ax1, ax2) = plt.subplots(2, sharex=True)
-    # fig.suptitle('Piston height over time')
-    ax1.set_ylabel('Height (mm)')
-    # ax1.set_title('From Capacitor')
-    ax2.set_ylabel('Syringe fill level (mm)')
-    ax2.set_xlabel('Timestamp')
-    ax1.plot(pd.to_datetime(rfc_data['Timestamp']), rfc_data['Height (mm)'])
-    ax2.plot(pd.to_datetime(sp_data['Timestamp']), sp_data['SP Position (mL)'])
-    fig.autofmt_xdate()
-
-    # plt.plot(pd.to_datetime(sp_data['Timestamp']), sp_data[' SP Position (mL)'])
-    # plt.plot(pd.to_datetime(rfc_data['Timestamp']), rfc_data[" Frequency (Hz)"]/7500)
-    plt.show()
-
-    if savepath is not None:
-        fig.savefig(os.path.join(r'../data_files',savepath))
-
-        sp =os.path.join(r'../data_files', savepath.strip(".png")+".xlsx")
-
-        wb = openpyxl.Workbook()
-        sheet1 = wb.active
-        sheet1.title = "SP data"
-        for r in dataframe_to_rows(sp_data, index=True, header=True):
-            sheet1.append(r)
-        sheet2 = wb.create_sheet("RFC data")
-        for r in dataframe_to_rows(rfc_data, index=True, header=True):
-            sheet2.append(r)
-
-        wb.save(filename=sp)
 
 
 if __name__ == "__main__":

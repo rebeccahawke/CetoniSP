@@ -118,13 +118,17 @@ class RFCounter(object):
     def convert_cal_rf(self, data):
         # Calibration at 20/1/2020: y = 0.001135274x - 25.139001220
         # where y = height and x is RFC value in Hz (typically 25-35 kHz)
+
+        # Calibration from 6/11/2020 using dial gauge and comparing several runs:
+        pars = [-7.67043811e-12,  5.66480566e-07, -1.27538994e-02,  8.91495880e+01]
+        # quartic coeffs = [2.30559894e-15, - 2.39545023e-10, 9.29559827e-06, - 1.58540497e-01,   1.00054383e+03]
+        # typical error is around 20 um
+
         heights = []
 
         for raw_val in data:
-            a = 0.001135274
-            b = -25.139001220
-
-            height = a*float(raw_val)+b
+            x = float(raw_val)
+            height = pars[0]*x**3 + pars[1]*x**2 + pars[2]*x + pars[3]
             heights.append(height)
 
         return heights
@@ -175,13 +179,13 @@ if __name__ == '__main__':
     db = cfg.database()  # loads database
     equipment = db.equipment  # loads subset of database with equipment being used
 
-    save = False
+    save = True
     trig_interval = 0.02        # trigger pulse repetition interval in seconds, using external trigger
-    meas_time = 20              # duration of measurement in seconds
+    meas_time = 50              # duration of measurement in seconds
     n_meas = int(meas_time/trig_interval)      # number of measurements to collect
     print("Number of measurements: {}".format(n_meas))
 
-    rfc = RFCounter(equipment['rfc'])
+    rfc = RFCounter(equipment['rfc_lh'])
     rfc.configure_rfcounter(n_meas, trig_interval)
 
     trig = Triggerer(equipment['wfg'])
@@ -199,6 +203,7 @@ if __name__ == '__main__':
 
     # process and plot data
     times = [x * trig_interval for x in range(0, n_meas)]
+    savepath = ""
     if save:
         savepath = r'../data_files/RF-data_{}.csv'.format(t0_s)
         with open(savepath, mode='w') as fp:

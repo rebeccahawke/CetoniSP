@@ -37,14 +37,13 @@ class Experimenter(object):
         self.sp.connect_to_pump("neMESYS_Low_Pressure_1_Pump")
 
         ### essential start-up routine ###
-        self.sp.configure_syringe(inner_dia=23.0329, stroke=30.0)  # 25 mL syringe
+        self.sp.configure_syringe(inner_dia=23.0329, stroke=40.0)  # 25 mL syringe
         # half usual stroke as syringe is pushed fully towards valve end (stroke usually 60.0)
         self.sp.set_units('mL', 'mL/min')
         self.sp.calibrate_pump()  # Only run this command with no syringe installed
 
-        self.sp.install_syringe()
-
-        if vol is not None:
+        ok = self.sp.install_syringe()
+        if ok and vol is not None:
             self.set_syringe_level(vol, flow=flow)
 
     def set_syringe_level(self, vol, flow=None):
@@ -190,9 +189,9 @@ class Experimenter(object):
 if __name__ == "__main__":
     # from experiment_methods import Experimenter
     exp = Experimenter()
-    exp.initialise_pump(1)
-    exp.run_single_step(-1, 10, time_int=20, wait_time=5)
-    exp.plot_data()
-    exp.run_triangle_wave(1, 15, 2, time_int=20, wait_time=5)
-    exp.plot_data()
-    exp.finish()
+    exp.initialise_pump(15)
+    # exp.run_single_step(-1, 10, time_int=20, wait_time=5)
+    # exp.plot_data()
+    # exp.run_triangle_wave(1, 15, 2, time_int=20, wait_time=5)
+    # exp.plot_data()
+    # exp.finish()

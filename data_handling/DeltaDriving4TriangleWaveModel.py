@@ -251,7 +251,7 @@ def fit_response_single_sine(folder, filename, A0=1., f=1., ):
     pars, cov = curve_fit(f=sin_fit, xdata=t, ydata=z_real, p0=[A0, f, 0.1], bounds=(-np.inf, np.inf))
     # # Get the standard deviations of the parameters (square roots of the diagonal of the covariance)
     # stdevs = np.sqrt(np.diag(cov))
-    # TODO: Calculate a sum square of the residuals as a measure of how 'clean' the sinusoid is
+    # Calculate a sum square of the residuals as a measure of how 'clean' the sinusoid is:
     res = z_real - sin_fit(t, *pars)
     res_sum = sum(i * i for i in res)
     # print("Pars {} {} {} {}\nCov {}\nStdevs {}".format(*pars, cov, stdevs))
@@ -275,7 +275,9 @@ def fit_response_single_sine(folder, filename, A0=1., f=1., ):
     # plt.show()
     plt.close()
 
-    return pars, linpars, res_sum
+    ht_ave = np.average(df["Height (mm)"][t0:t0+num_pts])
+
+    return pars, linpars, res_sum, ht_ave
 
 
 def z_fit(t, A, f, omega0, Qm, delta, fall):
@@ -380,7 +382,7 @@ def do_fft(folder, fname):
 def plot_all_FFTs(folder):
 
     ffts = []
-    for f in get_all_fnames(folder, "Tri", endpattern="_LVDT.xlsx"):
+    for f in get_all_fnames(folder, "Tri", endpattern="_LVDT.xlsx")[10:20]:
         print(f)
         ffts.append(do_fft(folder, f))
 
@@ -419,7 +421,7 @@ if __name__ == "__main__":
 
     folder_0p05 = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201109 TriangleWaves 0.05mL"
 
-    # plot_all_FFTs(folder_0p05)
+    plot_all_FFTs(folder_0p05)
     #
     # filename = "Tri_0.05_18_1604882252.6072_LVDT.xlsx"
     # vol = float(filename.split("_")[1])
@@ -431,26 +433,26 @@ if __name__ == "__main__":
     # print([filename, pars[0], pars[1], pars[2], linpars[0], linpars[1]])
 
 
-    fout = Workbook()
-    sh = fout.active
-
-    files = get_all_fnames(folder_0p05, "Tri_", endpattern="_LVDT.xlsx")
-
-    # files = ["Tri_0.05_18_1604882252.6072_LVDT.xlsx", "Tri_0.05_15_1604882091.3002_LVDT.xlsx"]
-
-    for filename in files:
-        print(filename)
-
-        vol = float(filename.split("_")[1])
-        flo = float(filename.split("_")[2])
-        f = 1/(2*vol/flo*60+0.025)
-
-        pars, linpars, res_sum = fit_response_single_sine(folder_0p05, filename, A0=A0, f=f, )
-        # returns [A, f, phi], [fall, offset]
-        sh.append([filename, pars[0], pars[1], pars[2], linpars[0], linpars[1], res_sum])
-        # print("{}, A0: {}, f: {}, omega0: {}, Qm: {}, delta: {}, fall: {}".format(filename, *z_pars))
-
-    fout.save("SineOsc.xlsx")
+    # fout = Workbook()
+    # sh = fout.active
+    #
+    # files = get_all_fnames(folder_0p05, "Tri_", endpattern="_LVDT.xlsx")
+    #
+    # # files = ["Tri_0.05_18_1604882252.6072_LVDT.xlsx", "Tri_0.05_15_1604882091.3002_LVDT.xlsx"]
+    #
+    # for filename in files:
+    #     print(filename)
+    #
+    #     vol = float(filename.split("_")[1])
+    #     flo = float(filename.split("_")[2])
+    #     f = 1/(2*vol/flo*60+0.025)
+    #
+    #     pars, linpars, res_sum, ht_ave = fit_response_single_sine(folder_0p05, filename, A0=A0, f=f, )
+    #     # returns [A, f, phi], [fall, offset]
+    #     sh.append([filename, pars[0], pars[1], pars[2], linpars[0], linpars[1], res_sum, ht_ave])
+    #     # print("{}, A0: {}, f: {}, omega0: {}, Qm: {}, delta: {}, fall: {}".format(filename, *z_pars))
+    #
+    # fout.save("SineOsc.xlsx")
 
 
 
