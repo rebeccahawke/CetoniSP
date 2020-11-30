@@ -56,11 +56,16 @@ def separate_waits_from_ramp(sp_data, rfc_data):
 
 
 
-fol_steps = r'G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201124_Steps_0p5mL'
+fol_steps = r'G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201123_Steps_0p2mL'
 
-files = get_all_fnames(fol_steps, "Step_", endpattern="_LVDT.xlsx")
+# files = get_all_fnames(fol_steps, "Step_", endpattern="_LVDT.xlsx")
 
-for fname in files:
+summary = "Summary_step_fits.xlsx"
+f1 = os.path.join(fol_steps, summary)
+xls = pd.ExcelFile(f1)
+starts = pd.read_excel(xls, 'Raw_LVDT_lo')
+
+for i, fname in enumerate(starts['Filename']):
     name_parts = fname.split("_")
     vol = float(name_parts[1])
     flo = float(name_parts[2])
@@ -71,21 +76,34 @@ for fname in files:
 
     x = rfc_data["Timestamp"][1:]
     y = rfc_data["LVDT (mm)"][1:]
-    x_i = range(len(y))
-    plt.plot(y)
-    plt.show()
+    x_i = np.linspace(0, 0.02 * len(x), len(x))
+    # plt.plot(y)
+    # plt.show()
 
-    start = int(input("start"))
+    start = int(starts['start'][i]) #int(input("start"))
     num_pts = int(abs(vol)/flo*60/time_int)
 
-    # start, end = separate_waits_from_ramp(sp_data, rfc_data)
-    # print(fname, start, end)
+    # Initial fall rate
+    pars_pre = fit_linear(x_i[0:start], y[0:start])
 
-    x_t = np.linspace(0, 0.02 * num_pts, num_pts)
-    pars = fit_linear(x_t, y[start:start+num_pts])
+    # Ramp rate
+    pars = fit_linear(x_i[start:start+num_pts], y[start:start+num_pts])
 
-    print(fname, start, num_pts, vol/0.5, flo, *pars)
+    # Final fall rate
+    end_pts = int(20/0.02)
+    pars_post = fit_linear(x_i[start+num_pts+50:], y[start+num_pts+50:])
 
+    plt.show()
+
+    deltaH = [(pars_post[0] - pars_pre[0]) * x + pars_post[1] - pars_pre[1] for x in x_i]
+    dh_ave = np.average(deltaH[start:start+num_pts])
+    dh_std_dev = np.std(deltaH[start:start+num_pts], ddof=1)
+
+    print(fname, start, num_pts, vol/abs(vol), flo, *pars, *pars_pre, *pars_post, dh_ave, dh_std_dev)
+
+
+    # plt.plot(x_i, deltaH)
+    # plt.show()
 
     # if vol < 0:  # aspiration/withdrawal: plunger ends at 15 mL
     # elif vol > 0:  # dispensing/infusion: plunger starts at 15 mL

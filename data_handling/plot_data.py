@@ -28,12 +28,12 @@ def fit_linear(x, y, a=1, b=1):
 
     plt.plot(x, linear(x, *pars), label='Fit: {:.3g} x + {:.3g}'.format(*pars))
     plt.scatter(x, res, )
-    plt.title("Calibration for LVDT from RFCounter data")
-    plt.xlabel("LVDT voltage (V)")
+    plt.title("Step measurement fitting with residuals") #Calibration for LVDT from RFCounter data")
+    plt.xlabel("Time (s)")
     plt.ylabel("Height (mm)")
     plt.legend()
-    plt.show()
-    plt.close()
+    # plt.show()
+    # plt.close()
 
     return pars
 
