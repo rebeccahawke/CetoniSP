@@ -82,17 +82,17 @@ class RFCounter(object):
         data is a list of n_meas raw values from the RF counter, in Hz
         """
         # set up for fast graphing
-        app = application()
-        mw = QtWidgets.QMainWindow()
-        mw.setWindowTitle("Capacitor raw data")
-        cw = QtWidgets.QWidget()
-        mw.setCentralWidget(cw)
-        layout = QtWidgets.QVBoxLayout()
-        cw.setLayout(layout)
-        pw1 = pg.PlotWidget(name='Capacitor raw data')
-        curve = pw1.plot()
-        layout.addWidget(pw1)
-        mw.show()
+        # app = application()
+        # mw = QtWidgets.QMainWindow()
+        # mw.setWindowTitle("Capacitor raw data")
+        # cw = QtWidgets.QWidget()
+        # mw.setCentralWidget(cw)
+        # layout = QtWidgets.QVBoxLayout()
+        # cw.setLayout(layout)
+        # pw1 = pg.PlotWidget(name='Capacitor raw data')
+        # curve = pw1.plot()
+        # layout.addWidget(pw1)
+        # mw.show()
 
         self.rfcounter.write("INPUT:LEVEL:AUTO ONCE")   # only need to get frequency level once
         self.rfcounter.write("INIT")                    # starts waiting for a trigger
@@ -107,11 +107,14 @@ class RFCounter(object):
             a = self.rfcounter.query("DATA:REM? 1,WAIT")  # a is a string
             # read one data value taken from memory to buffer; remove value from memory after reading
             data.append(float(a.strip("\n")))
-            curve.setData(data)
-            app.processEvents()
+            # curve.setData(data)
+            # app.processEvents()
 
         if self.triggerer is not None:
             self.triggerer.stop_trigger()
+
+        t1_s = time_ns() / 1e9
+        print("Elapsed time: {}".format(t1_s - t0_s))
 
         return t0_s, data
 
@@ -180,8 +183,8 @@ if __name__ == '__main__':
     equipment = db.equipment  # loads subset of database with equipment being used
 
     save = True
-    trig_interval = 0.02        # trigger pulse repetition interval in seconds, using external trigger
-    meas_time = 50              # duration of measurement in seconds
+    trig_interval = 0.01        # trigger pulse repetition interval in seconds, using external trigger
+    meas_time = 60            # duration of measurement in seconds
     n_meas = int(meas_time/trig_interval)      # number of measurements to collect
     print("Number of measurements: {}".format(n_meas))
 
@@ -215,6 +218,7 @@ if __name__ == '__main__':
 
     plt.plot(times, height_data)
     plt.scatter(times, height_data)
+    plt.title("RFC position")
     plt.xlabel("Time (s)")
     plt.ylabel("Position (mm)")
     plt.tight_layout()
