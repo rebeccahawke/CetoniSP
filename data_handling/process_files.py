@@ -386,11 +386,17 @@ if __name__ == "__main__":
     folder_20mL = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201105 TriangleWaves 0.2mL"
     folder_0p05 = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201109 TriangleWaves 0.05mL"
 
-    fol_steps = r'G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201124_Steps_0p5mL'
+    fol_steps = r'G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201201_Step_loflo'
     # collate_sp_rfc_lvdt(fol_steps)
 
-    fol = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201109 TriangleWaves 0.05mL\FallRates"
-    f1 = "LVDT_RFC_calrun.xlsx"
+    fol = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201203_LVDT_timeinttest"
+    for fname in get_all_fnames(fol, pattern="LVDT_", endpattern='.csv'):
+        i_data = pd.read_csv(os.path.join(fol, fname), header=None)
+        i_data.columns = ['LVDT (V)']
+        x = np.linspace(0, 999, num=1000)
+        pars, stdres = fit_linear(x, i_data['LVDT (V)'], a=0, b=0.7)
+        print(fname, *pars, stdres)
+
 
     # get_LVDTcal_from_RFCcal(os.path.join(fol, f1))
 
