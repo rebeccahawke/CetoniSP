@@ -5,6 +5,7 @@
 # ===========================================================================
 from time import time_ns
 from datetime import datetime
+import numpy as np
 import matplotlib.pyplot as plt
 
 import pyqtgraph as pg
@@ -67,7 +68,7 @@ class RFCounter(object):
     def set_triggerer(self, triggerer):
         self.triggerer = triggerer
 
-    def read_n_raw_readings(self, n_meas=250):
+    def read_n_raw_readings(self, n_meas=250, trig_interval=0.02):
         """
 
         Parameters
@@ -82,33 +83,36 @@ class RFCounter(object):
         data is a list of n_meas raw values from the RF counter, in Hz
         """
         # set up for fast graphing
-        # app = application()
-        # mw = QtWidgets.QMainWindow()
-        # mw.setWindowTitle("Capacitor raw data")
-        # cw = QtWidgets.QWidget()
-        # mw.setCentralWidget(cw)
-        # layout = QtWidgets.QVBoxLayout()
-        # cw.setLayout(layout)
-        # pw1 = pg.PlotWidget(name='Capacitor raw data')
-        # curve = pw1.plot()
-        # layout.addWidget(pw1)
-        # mw.show()
+        app = application()
+        mw = QtWidgets.QMainWindow()
+        mw.setWindowTitle("Capacitor raw data")
+        cw = QtWidgets.QWidget()
+        mw.setCentralWidget(cw)
+        layout = QtWidgets.QVBoxLayout()
+        cw.setLayout(layout)
+        pw1 = pg.PlotWidget(name='Capacitor raw data')
+        curve = pw1.plot()
+        layout.addWidget(pw1)
+        mw.show()
 
         self.rfcounter.write("INPUT:LEVEL:AUTO ONCE")   # only need to get frequency level once
         self.rfcounter.write("INIT")                    # starts waiting for a trigger
-        data = []
+        data = np.empty(n_meas)
 
         if self.triggerer is not None:
             self.triggerer.start_trigger()
 
         t0_s = time_ns()/1e9
+        rdgs_per_s = 1/trig_interval
 
         for i in range(n_meas):
             a = self.rfcounter.query("DATA:REM? 1,WAIT")  # a is a string
             # read one data value taken from memory to buffer; remove value from memory after reading
-            data.append(float(a.strip("\n")))
-            # curve.setData(data)
-            # app.processEvents()
+            data[i] = float(a.strip("\n"))
+
+            if i % rdgs_per_s == 0:  # update plot every second
+                curve.setData(data[:i])  # show only the collected data
+                app.processEvents()
 
         if self.triggerer is not None:
             self.triggerer.stop_trigger()
@@ -197,7 +201,7 @@ if __name__ == '__main__':
     rfc.set_triggerer(trig)
 
     # take readings
-    t0_s, raw_data = rfc.read_n_raw_readings(n_meas)
+    t0_s, raw_data = rfc.read_n_raw_readings(n_meas, trig_interval)
 
     rfc.close()
     trig.close_comms()

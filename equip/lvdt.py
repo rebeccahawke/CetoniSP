@@ -76,11 +76,11 @@ class LVDT_HP3458A(object):
     def read_lvdt_ext_trig(self):
         n = int(self.lvdt.query("MCOUNT?"))
         print("MCOUNT:", n)
-        readings = []
-        for n in range(n):
+        readings = [0]*n
+        for i in range(n):
             a = lvdt.read_raw_lvdt()
             # print(a)
-            readings.append(a)
+            readings[i] = a
 
         return readings
 
