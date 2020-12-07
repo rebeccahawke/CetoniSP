@@ -25,6 +25,7 @@ def fit_linear(x, y, a=1, b=1):
     # Calculate the residuals
     fit = linear(x, *pars)
     res = [y_ - x_ for y_, x_ in zip(y, fit)]
+    std_res = np.std(res, ddof=1)
 
     plt.plot(x, linear(x, *pars), label='Fit: {:.3g} x + {:.3g}'.format(*pars))
     plt.scatter(x, res, )
@@ -35,7 +36,7 @@ def fit_linear(x, y, a=1, b=1):
     # plt.show()
     # plt.close()
 
-    return pars
+    return pars, std_res
 
 
 def quadratic(x, a=0.1, b=1, c=10):
