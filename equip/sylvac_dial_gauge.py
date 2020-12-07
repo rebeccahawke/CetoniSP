@@ -13,10 +13,11 @@ class DialGauge(object):
         reading = syl.query('PRI?')
         syl.disconnect()
 
-        return reading
+        return reading.strip("~")
 
 
 if __name__ == "__main__":
+    from time import time_ns
     from msl.equipment import Config
 
     config = r'C:\Users\r.hawke\PycharmProjects\CetoniSP\config.xml'
@@ -27,5 +28,13 @@ if __name__ == "__main__":
 
     syl = DialGauge(record)
 
-    for i in range(20):
-        print(syl.get_reading())
+
+    savepath = r'C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\RFC_cal_vacuum/DialGauge_{}_{}.csv'.format(12, time_ns()/ 1e9)
+    with open(savepath, mode='w') as fp:
+        fp.write("Mmmt No.,Timestamp (s),Height (mm)\n")
+        for i in range(50):
+            print(i)
+            fp.write("{},{},{}\n".format(i, time_ns()/ 1e9, syl.get_reading()))
+        fp.close()
+    print("Data saved to {}".format(savepath))
+
