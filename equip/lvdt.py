@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     save = True
     trig_interval = 0.01        # trigger pulse repetition interval in seconds, using external trigger
-    meas_time = 60            # duration of measurement in seconds
+    meas_time = 45            # duration of measurement in seconds
     n_meas = int(meas_time/trig_interval)      # number of measurements to collect
     print("Number of measurements: {}".format(n_meas))
 
@@ -180,10 +180,12 @@ if __name__ == "__main__":
             fp.close()
         print("Data saved to {}".format(savepath))
 
-    plt.plot(times, readings)
+    # plt.plot(times, readings)
     plt.scatter(times, readings)
     plt.title("LVDT readings")
     plt.xlabel("Time (s)")
     plt.ylabel("Voltage (V)")
     plt.tight_layout()
+    if save:
+        plt.savefig(savepath.strip("csv")+"png")
     plt.show()

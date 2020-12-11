@@ -98,7 +98,7 @@ def collate_sp_rfc_lvdt(folder):
     # for i in range(len(rfcfs)):
     #     print(rfcfs[i])
 
-    lvdtfs = sorted(get_all_fnames(folder, "LVDT_", endpattern=".csv"))
+    lvdtfs = sorted(get_all_fnames(folder, "LVDT-data_", endpattern=".csv"))
     # for i in range(len(lvdtfs)):
     #     print(lvdtfs[i])
 
@@ -106,13 +106,12 @@ def collate_sp_rfc_lvdt(folder):
         print(spfs[i], lvdtfs[i], rfcfs[i])
         sp_df = pd.read_csv(os.path.join(folder, spfs[i]))
         rfc_df = pd.read_csv(os.path.join(folder, rfcfs[i]))
-        lvdt_df = pd.read_csv(os.path.join(folder, lvdtfs[i]), header=None)
-        lvdt_df.columns = ["LVDT (V)"]
-        lvdt_ht = pd.DataFrame(convert_cal_lvdt(lvdt_df["LVDT (V)"]), columns=["LVDT (mm)"])
-
+        lvdt_df = pd.read_csv(os.path.join(folder, lvdtfs[i]))  # updated for collection using Python not Igor Pro
+        lvdt_df.rename(columns={'Timestamp': 'Time (s)'}, inplace=True)
+        lvdt_ht = pd.DataFrame(convert_cal_lvdt(lvdt_df["Voltage (V)"]), columns=["LVDT (mm)"])
         h_data = pd.concat([rfc_df, lvdt_df, lvdt_ht], axis=1)
 
-        savepath = os.path.join(folder, spfs[i].strip(".csv")+ "_LVDT.xlsx")
+        savepath = os.path.join(folder, spfs[i].strip(".csv")+ "_all.xlsx")
 
         wb = Workbook()
         sheet1 = wb.active
@@ -387,15 +386,17 @@ if __name__ == "__main__":
     folder_0p05 = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201109 TriangleWaves 0.05mL"
 
     fol_steps = r'G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201201_Step_loflo'
-    # collate_sp_rfc_lvdt(fol_steps)
 
-    fol = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201203_LVDT_timeinttest"
-    for fname in get_all_fnames(fol, pattern="LVDT_", endpattern='.csv'):
-        i_data = pd.read_csv(os.path.join(fol, fname), header=None)
-        i_data.columns = ['LVDT (V)']
-        x = np.linspace(0, 999, num=1000)
-        pars, stdres = fit_linear(x, i_data['LVDT (V)'], a=0, b=0.7)
-        print(fname, *pars, stdres)
+    fol = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201209 Steps 0.75mL"
+    collate_sp_rfc_lvdt(fol)
+
+
+    # for fname in get_all_fnames(fol, pattern="LVDT_", endpattern='.csv'):
+    #     i_data = pd.read_csv(os.path.join(fol, fname), header=None)
+    #     i_data.columns = ['LVDT (V)']
+    #     x = np.linspace(0, 999, num=1000)
+    #     pars, stdres = fit_linear(x, i_data['LVDT (V)'], a=0, b=0.7)
+    #     print(fname, *pars, stdres)
 
 
     # get_LVDTcal_from_RFCcal(os.path.join(fol, f1))
