@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from datetime import datetime
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from openpyxl import Workbook, load_workbook
@@ -31,7 +32,7 @@ def get_all_LVDTxlsx_fnames(mydir):
     return files
 
 
-def fit_damping(folder, filename, t_start=None):
+def fit_damping(folder, filename, t_start=None, end=None):
     xls = pd.ExcelFile(os.path.join(folder, filename))
     # df1 = pd.read_excel(xls, 'SP data')
     df2 = pd.read_excel(xls, 'RFC data')
@@ -44,13 +45,19 @@ def fit_damping(folder, filename, t_start=None):
     run = file_list[3]
     ID = set + flowrate + run
 
-    time = np.linspace(0, 120, 6000)
-    # height = df2["LVDT (V)"][1:]
-    height = df2["LVDT (V)"][1:]
+    x = df2["Timestamp"][1:]
+    x_t = [datetime.strptime(i, '%Y-%m-%d %H:%M:%S.%f') for i in x]
+    x_d = [(i - x_t[0]).total_seconds() for i in x_t]
+    height = df2["LVDT (mm)"][1:]
     # t_start = df2["LVDT (V)"][0]
     print(t_start)
 
-    timestep = 0.02
+    time_delta = datetime.strptime(x[2], '%Y-%m-%d %H:%M:%S.%f')-datetime.strptime(x[1], '%Y-%m-%d %H:%M:%S.%f')
+    timestep = time_delta.total_seconds()
+    print(timestep)
+
+    time = np.linspace(0, x_d[-1], len(x_d))
+    print(time)
 
     if t_start is None:
         plt.plot(time, height,
@@ -60,7 +67,10 @@ def fit_damping(folder, filename, t_start=None):
 
     a = t_start
 
-    b = a + 5
+    if end is not None:
+        b = end
+    else:
+        b = a + 5
 
     pointA = int(a / timestep)
     pointB = int(b / timestep)
@@ -79,11 +89,12 @@ def fit_damping(folder, filename, t_start=None):
 
         time_synth = np.linspace(0, t_start+10, int(100*(t_start+10)+1))
 
-        t = time[pointA:pointB] - a
+        t = time[pointA:pointB] - time[pointA]
         h = height[pointA:pointB]
 
         try:
-            optParams, pcov = curve_fit(dampedHO, t, h)
+            optParams, pcov = curve_fit(dampedHO, t, h, p0=[1, 1, 7, 0, -0.0001, np.average(h)], bounds=(-100, 100))
+            print(optParams)
             print('Amplitude =', optParams[0])
             print('Omega0 =', optParams[1])
             print('T0 = {}, f0 = {}'.format(2*np.pi/optParams[1], optParams[1]/(2*np.pi)))
@@ -95,8 +106,12 @@ def fit_damping(folder, filename, t_start=None):
             # print("{} {} {}".format(t_start, optParams[1]/(2*np.pi), optParams[2]))
 
             fit_osc = dampedHO(time_synth, optParams[0], optParams[1], optParams[2], optParams[3], slope=optParams[4], offset=optParams[5] )
-            fit = plt.plot(time_synth + t_start, fit_osc,
+            fit = plt.plot(time_synth+t_start, fit_osc,
                         label='Model', color='k', alpha=0.5)
+            res = [y_ - x_ for y_, x_ in zip(height[pointA:pointB], fit_osc)]
+            stdres = np.std(res, ddof=1)
+
+            plt.plot(time_synth[pointA:pointB], res)
 
             plt.legend()
 
@@ -105,7 +120,7 @@ def fit_damping(folder, filename, t_start=None):
             plt.tight_layout()
             plt.show()
             plt.close()
-            return t_start, optParams[1]/(2*np.pi), optParams[2], optParams[4], optParams[5]
+            return t_start, optParams[1]/(2*np.pi), optParams[2], optParams[4], optParams[5], stdres
 
         except RuntimeError as e:
             print(e)
@@ -117,7 +132,8 @@ folder_1Hz = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files\2020-10-23 T
 folder_20mL = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201105 TriangleWaves 0.2mL"
 folder_0p05 = r"G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201109 TriangleWaves 0.05mL"
 
-folder = folder_0p05
+folder = r'G:\Shared drives\MSL - Shared\MSL Kibble Balance\_p_PressureManifoldConsiderations\Flow and Pressure control\SyringePumpTests\20201209 Steps 0.75mL'
+
 # folder = r"C:\Users\r.hawke\PycharmProjects\CetoniSP\data_files"
 # filename = "Tri_0.05_5.2_1604875515.3838775_LVDT.xlsx"
 #"Tri_0.05_2_1604610559.7766001_LVDT.xlsx"
@@ -131,9 +147,9 @@ folder = folder_0p05
 
 # files = get_all_fnames(folder_0p05, "Tri_", endpattern="_LVDT.xlsx")
 # #
-filename = r'Tri_0.05_1_1604886483.3542001_LVDT.xlsx'
-t_start, f0, Q, slope, offset = fit_damping(folder, filename, t_start=None)
-print(t_start, f0, Q, slope, offset)
+filename = r'Step_0.75_25_1607473103.6122003_all.xlsx'
+t_start, f0, Q, slope, offset, stdres = fit_damping(folder, filename, t_start=20.18, end=21.9)
+print(t_start, f0, Q, slope, offset, stdres)
 
 # filename = r'Tri_0.05_5.9_1604876796.7822_LVDT.xlsx'
 # t_start, f0, Q, slope, offset = fit_damping(folder, filename, t_start=None)
@@ -141,7 +157,7 @@ print(t_start, f0, Q, slope, offset)
 
 # fout = load_workbook("DampedOsc.xlsx")
 # sh = fout.active
-#
+# 0.007781219769354897
 # for i in range(47):
 #     filename = sh["A"+str(i+1)].value
 #     print(filename)
