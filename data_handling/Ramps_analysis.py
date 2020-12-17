@@ -67,7 +67,7 @@ files = get_all_fnames(fol_steps, "Step_", endpattern="_all.xlsx")
 
 summary2 = open("starts.csv", mode='a')
 
-summary = "Summary1.xlsx"
+summary = "Start_End_byEye.xlsx"
 f1 = os.path.join(fol_steps, summary)
 xls = pd.ExcelFile(f1)
 starts = pd.read_excel(xls, 'Sheet1')
@@ -115,21 +115,23 @@ for i, fname in enumerate(starts['fname']):
         # Final fall rate
         pars_post, res_post = fit_linear(x_i[start+num_pts+wait_post:], y[start+num_pts+wait_post:])
 
-        plt.show()
+        plt.clf()
 
-        a = prompt.yes_no("Is this fitting satisfactory?")
-        if a:
-            break
+        break
 
-        start = int(input("new start (was {})".format(start)))
-        end = int(input("new end (was {})".format(end)))
+        # a = prompt.yes_no("Is this fitting satisfactory?")
+        # if a:
+        #     break
+
+        # start = int(input("new start (was {})".format(start)))
+        # end = int(input("new end (was {})".format(end)))
 
     deltaH = [(pars_post[0] - pars_pre[0]) * x + pars_post[1] - pars_pre[1] for x in x_i]
     dh_ave = deltaH[start+int(num_pts/2)]
     dh_std_dev = np.std(deltaH[start:start+num_pts], ddof=1)
 
     print(fname, start, num_pts, vol/abs(vol), flo, *pars, res, *pars_pre, res_pre, *pars_post, res_post, dh_ave, dh_std_dev)
-    summary2.writelines("{},{},{}\n".format(fname, start, end))
+    # summary2.writelines("{},{},{}\n".format(fname, start, end))
 
 summary2.close()
 
